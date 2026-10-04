@@ -1,0 +1,26 @@
+# Project docs are kept local only (owner's choice), not versioned.
+docs/
+CLAUDE.md
+
+# Build output
+target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# IDE
+.github/modernize/
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+
+# Secrets — never commit. Commit .env.example with placeholder values instead.
+.env
+.env.*
+!.env.example
+
+# Logs and OS noise
+*.log
+.DS_Store
+Thumbs.db

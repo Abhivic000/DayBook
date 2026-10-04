@@ -1,0 +1,7 @@
+# Local development only. Activated with --spring.profiles.active=local.
+# Values match compose.yaml; they are throwaway dev credentials, not secrets.
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/daybook
+    username: daybook
+    password: daybook

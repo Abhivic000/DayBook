@@ -1,0 +1,21 @@
+# Local infrastructure. Phase 1: PostgreSQL only.
+# Start: docker compose up -d     Stop: docker compose down     Wipe data: docker compose down -v
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: daybook
+      POSTGRES_USER: daybook
+      POSTGRES_PASSWORD: ${DAYBOOK_DB_PASSWORD:-daybook}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U daybook -d daybook"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres-data:

@@ -1,0 +1,27 @@
+# Base configuration. Anything environment-specific or secret comes from
+# environment variables; there are deliberately no defaults for credentials.
+spring:
+  application:
+    name: daybook-api
+  datasource:
+    url: ${DAYBOOK_DB_URL}
+    username: ${DAYBOOK_DB_USER}
+    password: ${DAYBOOK_DB_PASSWORD}
+  flyway:
+    # Schema is owned by versioned migrations in db/migration — never auto-generated.
+    locations: classpath:db/migration
+  mvc:
+    problemdetails:
+      # RFC 9457 error bodies for framework-raised errors.
+      enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      # Exposes /actuator/health/liveness and /actuator/health/readiness (FR-11.5).
+      probes:
+        enabled: true
