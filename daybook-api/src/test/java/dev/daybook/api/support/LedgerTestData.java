@@ -46,8 +46,12 @@ public class LedgerTestData {
 
   public UUID newFundedUserAccount(UUID tenantId, long balanceMinor) {
     UUID id = newUserAccount(tenantId);
-    funding.fund(tenantId, id, Money.ofMinor(balanceMinor));
+    fund(tenantId, id, balanceMinor);
     return id;
+  }
+
+  public void fund(UUID tenantId, UUID accountId, long amountMinor) {
+    funding.fund(tenantId, accountId, Money.ofMinor(amountMinor));
   }
 
   public UUID treasuryOf(UUID tenantId) {
