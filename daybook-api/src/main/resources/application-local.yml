@@ -5,3 +5,14 @@ spring:
     url: jdbc:postgresql://localhost:5432/daybook
     username: daybook
     password: daybook
+
+daybook:
+  security:
+    # SHA-256 of the dev admin key "dev-admin-key". Use: Authorization: Bearer dev-admin-key
+    admin-key-sha256: df76ff796f70d2c9cb055ea6280553caa27eda26b70e01082c160de75a05a4a9
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true

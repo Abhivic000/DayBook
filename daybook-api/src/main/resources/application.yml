@@ -12,8 +12,20 @@ spring:
     locations: classpath:db/migration
   mvc:
     problemdetails:
-      # RFC 9457 error bodies for framework-raised errors.
+      # RFC 9457 bodies for framework errors not covered by ApiExceptionHandler.
       enabled: true
+
+daybook:
+  security:
+    # SHA-256 (hex) of the admin API key. Empty = admin endpoints disabled (fail closed).
+    admin-key-sha256: ${DAYBOOK_ADMIN_KEY_SHA256:}
+
+springdoc:
+  # Generated OpenAPI spec and Swagger UI are off unless a profile turns them on (FR-12.4).
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
 
 management:
   endpoints:
