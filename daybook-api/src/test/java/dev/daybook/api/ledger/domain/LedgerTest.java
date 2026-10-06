@@ -59,6 +59,25 @@ class LedgerTest {
   }
 
   @Test
+  void trailRecordsEachEntryWithItsAccountStateAfterward() {
+    Account from = user(1_000);
+    Account to = user(0);
+
+    Ledger.Result result =
+        Ledger.applyWithTrail(
+            Posting.move(from.id(), to.id(), Money.ofMinor(300)), List.of(from, to));
+
+    assertThat(result.trail()).hasSize(2);
+    Ledger.AppliedEntry debit = result.trail().get(0);
+    assertThat(debit.entry().direction()).isEqualTo(Direction.DEBIT);
+    assertThat(debit.accountAfter().balance()).isEqualTo(Money.ofMinor(700));
+    assertThat(debit.accountAfter().version()).isEqualTo(1);
+    Ledger.AppliedEntry credit = result.trail().get(1);
+    assertThat(credit.accountAfter().id()).isEqualTo(to.id());
+    assertThat(credit.accountAfter().balance()).isEqualTo(Money.ofMinor(300));
+  }
+
+  @Test
   void failsWhenAnAccountIsNotSupplied() {
     Account from = user(100);
 

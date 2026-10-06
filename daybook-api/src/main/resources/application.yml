@@ -10,6 +10,19 @@ spring:
   flyway:
     # Schema is owned by versioned migrations in db/migration — never auto-generated.
     locations: classpath:db/migration
+  kafka:
+    bootstrap-servers: ${DAYBOOK_KAFKA_BOOTSTRAP_SERVERS}
+    producer:
+      # Wait for the broker to fully persist each record before counting it as sent.
+      acks: all
+      properties:
+        # The producer de-duplicates its own retries and keeps per-partition order.
+        enable.idempotence: true
+        # Fail fast when the broker is down, so a relay cycle never stalls for minutes;
+        # unsent events simply stay in the outbox until the next cycle.
+        max.block.ms: 5000
+        request.timeout.ms: 5000
+        delivery.timeout.ms: 15000
   mvc:
     problemdetails:
       # RFC 9457 bodies for framework errors not covered by ApiExceptionHandler.

@@ -30,16 +30,19 @@ public class PostingService {
   private final AccountRepository accounts;
   private final TransactionRepository transactions;
   private final LedgerEntryRepository entries;
+  private final AccountEntryEventWriter events;
   private final Money maxAmount;
 
   PostingService(
       AccountRepository accounts,
       TransactionRepository transactions,
       LedgerEntryRepository entries,
+      AccountEntryEventWriter events,
       LedgerProperties properties) {
     this.accounts = accounts;
     this.transactions = transactions;
     this.entries = entries;
+    this.events = events;
     this.maxAmount = Money.ofMinor(properties.maxTransactionAmountMinor());
   }
 
@@ -72,16 +75,20 @@ public class PostingService {
 
     // 2. Check and apply in memory. Every business rejection is thrown here, before any write.
     guard.accept(byId);
-    Map<UUID, Account> updated = Ledger.apply(posting, locked);
+    Ledger.Result applied = Ledger.applyWithTrail(posting, locked);
 
-    // 3. Write: transaction, entries, balances. Commit makes all of it visible at once.
+    // 3. Write: transaction, entries, balances, and one outbox event per entry. Commit makes all
+    //    of it visible at once — an event can never exist without its entry, or vice versa.
+    //    The events are written while the account locks are still held, so for each account the
+    //    outbox order matches the commit order (ADR 0010).
     Transaction transaction =
         Transaction.settled(UUID.randomUUID(), tenantId, type, posting.amount());
     transactions.insert(transaction);
     entries.insert(transaction, posting);
     for (Account before : locked) {
-      accounts.updateBalance(updated.get(before.id()), before.version());
+      accounts.updateBalance(applied.accounts().get(before.id()), before.version());
     }
+    events.record(transaction, applied.trail());
     return transaction;
   }
 }

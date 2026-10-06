@@ -5,6 +5,8 @@ spring:
     url: jdbc:postgresql://localhost:5432/daybook
     username: daybook
     password: daybook
+  kafka:
+    bootstrap-servers: localhost:9092
 
 daybook:
   security:
