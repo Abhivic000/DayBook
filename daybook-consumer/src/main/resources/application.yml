@@ -26,6 +26,16 @@ spring:
       # Up to 3 partitions processed in parallel; each partition is still read in order.
       concurrency: 3
 
+  mvc:
+    problemdetails:
+      # RFC 9457 error bodies (e.g. an invalid ?limit on the DLQ endpoint).
+      enabled: true
+
+daybook:
+  security:
+    # SHA-256 (hex) of the admin key, same as the API's. Empty = admin endpoints disabled.
+    admin-key-sha256: ${DAYBOOK_ADMIN_KEY_SHA256:}
+
 management:
   endpoints:
     web:

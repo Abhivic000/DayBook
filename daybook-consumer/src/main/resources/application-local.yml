@@ -8,3 +8,8 @@ spring:
     password: daybook_consumer
   kafka:
     bootstrap-servers: localhost:9092
+
+daybook:
+  security:
+    # SHA-256 of the dev admin key "dev-admin-key" (same as the API's local profile).
+    admin-key-sha256: df76ff796f70d2c9cb055ea6280553caa27eda26b70e01082c160de75a05a4a9
