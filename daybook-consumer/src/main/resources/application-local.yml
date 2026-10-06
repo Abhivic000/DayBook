@@ -1,0 +1,10 @@
+# Local development only. Activated with --spring.profiles.active=local.
+# Throwaway dev credentials matching compose.yaml and the API's local profile.
+# The API must have started once first: its migration V6 creates this role.
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/daybook
+    username: daybook_consumer
+    password: daybook_consumer
+  kafka:
+    bootstrap-servers: localhost:9092

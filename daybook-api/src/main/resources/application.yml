@@ -10,6 +10,9 @@ spring:
   flyway:
     # Schema is owned by versioned migrations in db/migration — never auto-generated.
     locations: classpath:db/migration
+    placeholders:
+      # Password for the consumer's database role, created by migration V6 (ADR 0013).
+      consumer-password: ${DAYBOOK_CONSUMER_DB_PASSWORD}
   kafka:
     bootstrap-servers: ${DAYBOOK_KAFKA_BOOTSTRAP_SERVERS}
     producer:

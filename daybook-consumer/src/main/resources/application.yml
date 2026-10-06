@@ -1,0 +1,37 @@
+# Consumer service configuration. Connection details and credentials come from
+# environment variables; there are deliberately no defaults for credentials.
+server:
+  port: 8082
+
+spring:
+  application:
+    name: daybook-consumer
+  datasource:
+    url: ${DAYBOOK_DB_URL}
+    # The consumer's own least-privileged role (ADR 0005, 0013).
+    username: ${DAYBOOK_CONSUMER_DB_USER}
+    password: ${DAYBOOK_CONSUMER_DB_PASSWORD}
+  flyway:
+    # Migrations for the projection schema only, with their own history table inside it.
+    schemas: projection
+    default-schema: projection
+    locations: classpath:db/migration
+  kafka:
+    bootstrap-servers: ${DAYBOOK_KAFKA_BOOTSTRAP_SERVERS}
+    consumer:
+      # A brand-new consumer group starts from the oldest retained event, so the
+      # projection can be rebuilt by consuming with a fresh group.
+      auto-offset-reset: earliest
+    listener:
+      # Up to 3 partitions processed in parallel; each partition is still read in order.
+      concurrency: 3
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true

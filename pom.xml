@@ -19,6 +19,7 @@
 
     <modules>
         <module>daybook-api</module>
+        <module>daybook-consumer</module>
     </modules>
 
     <properties>
