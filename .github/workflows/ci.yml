@@ -37,8 +37,19 @@ jobs:
       - name: Build and test
         run: ./mvnw -B -ntp verify
 
-      - name: Start Postgres
+      - name: Start Postgres and Kafka
         run: docker compose up -d --wait
+
+      # Real processes, real hard kill: events committed before the API dies are published after
+      # restart and projected exactly once. Runs before the smoke test, whose long-running API
+      # would otherwise publish the events this test needs to keep unpublished.
+      - name: Crash test
+        shell: pwsh
+        run: ./scripts/crash-test.ps1
+
+      - name: Show crash-test logs
+        if: failure()
+        run: cat /tmp/daybook-crash-test-*/*.log || true
 
       # The 'local' profile carries throwaway dev credentials that match compose.yaml.
       - name: Start the API

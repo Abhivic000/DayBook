@@ -3,6 +3,7 @@ package dev.daybook.api.web;
 import dev.daybook.api.common.domain.DomainException;
 import dev.daybook.api.common.domain.NotFoundException;
 import dev.daybook.api.idempotency.domain.IdempotencyRequestInProgressException;
+import dev.daybook.api.statement.application.StatementUnavailableException;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,6 +47,17 @@ class ApiExceptionHandler {
   @ExceptionHandler(NotFoundException.class)
   ResponseEntity<ProblemBody> notFound(NotFoundException e) {
     return respond(Problems.of(HttpStatus.NOT_FOUND, "not-found", e.getMessage()));
+  }
+
+  @ExceptionHandler(StatementUnavailableException.class)
+  ResponseEntity<ProblemBody> statementUnavailable(StatementUnavailableException e) {
+    log.warn("Statement projection unavailable", e);
+    return respond(
+        Problems.of(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "statement-unavailable",
+            "The statement is not available yet. Account history is always available at"
+                + " /v1/accounts/{id}/transactions."));
   }
 
   @ExceptionHandler(IdempotencyRequestInProgressException.class)
