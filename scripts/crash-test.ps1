@@ -77,8 +77,36 @@ function Start-App([string] $Name, [string] $Jar, [int] $Port, [string[]] $Extra
         -RedirectStandardOutput (Join-Path $logDir "$Name.out.log") `
         -RedirectStandardError (Join-Path $logDir "$Name.err.log")
     $script:processes[$Name] = $process
-    Wait-DaybookReady -BaseUrl "http://localhost:$Port" -TimeoutSeconds $TimeoutSeconds
-    Write-Host "  started $Name (pid $($process.Id), port $Port)"
+
+    # Wait for readiness, but fail at once - with the reason - if the process dies on startup.
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        if ($process.HasExited) {
+            throw "$Name exited during startup (exit code $($process.ExitCode)).`n$(Get-LogTail $Name)"
+        }
+        try {
+            $probe = Invoke-DaybookApi -BaseUrl "http://localhost:$Port" -Method GET -Path '/actuator/health/readiness'
+            if ($probe.Status -eq 200) {
+                Write-Host "  started $Name (pid $($process.Id), port $Port)"
+                return
+            }
+        } catch {
+            # Not listening yet.
+        }
+        Start-Sleep -Seconds 1
+    }
+    throw "$Name was not ready on port $Port within $TimeoutSeconds seconds.`n$(Get-LogTail $Name)"
+}
+
+function Get-LogTail([string] $Name) {
+    $lines = @()
+    foreach ($suffix in 'out', 'err') {
+        $file = Join-Path $logDir "$Name.$suffix.log"
+        if (Test-Path $file) {
+            $lines += Get-Content $file -Tail 15
+        }
+    }
+    return "--- last log lines of $Name ---`n" + ($lines -join "`n")
 }
 
 function Stop-App([string] $Name) {
@@ -148,8 +176,10 @@ try {
 
     Write-Host ''
     Write-Host 'Phase 1: relay off, commit transfers, then kill the API' -ForegroundColor Cyan
-    Start-App 'consumer' $consumerJar $ConsumerPort @()
+    # API first: its migration V6 creates the database role the consumer logs in with (ADR 0013).
+    # On a fresh database (as in CI) the consumer cannot even connect until the API has started.
     Start-App 'api' $apiJar $ApiPort @('--daybook.outbox.relay-enabled=false')
+    Start-App 'consumer' $consumerJar $ConsumerPort @()
 
     $tenant = Api POST '/v1/admin/tenants' $AdminKey $null @{ name = "crash-$run" }
     $tenantId = $tenant.Json.tenantId
