@@ -108,7 +108,11 @@ class HttpPspGateway implements PspGateway {
         throw new PspNotAcceptedException("PSP unreachable: " + cause.getMessage(), true);
       }
       // The request may have reached the PSP: read timeout, reset connection, ...
-      throw new PspUnknownOutcomeException("No answer from PSP: " + e.getMessage());
+      throw new PspUnknownOutcomeException(
+          "No answer from PSP: "
+              + (cause == null ? e : cause).getClass().getSimpleName()
+              + ": "
+              + (cause == null ? e.getMessage() : cause.getMessage()));
     }
   }
 

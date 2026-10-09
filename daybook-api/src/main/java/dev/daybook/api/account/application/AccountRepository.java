@@ -17,13 +17,20 @@ public interface AccountRepository {
   Optional<Account> findSystemAccount(UUID tenantId, AccountType type);
 
   /**
-   * Locks the given accounts with {@code SELECT ... FOR UPDATE} in ascending id order, and returns
-   * those that exist for the tenant. Must be called inside a transaction; the locks are held until
-   * it ends.
+   * Locks the given accounts with {@code SELECT ... FOR NO KEY UPDATE} in ascending id order, and
+   * returns those that exist for the tenant. Must be called inside a transaction; the locks are
+   * held until it ends.
    *
    * <p>The ordering is done by the database, never in Java: every code path must lock in the same
    * order or opposing transfers deadlock, and Java's {@code UUID.compareTo} disagrees with
    * Postgres's uuid ordering.
+   *
+   * <p>{@code NO KEY UPDATE}, not {@code UPDATE}: we change balances, never an account's id. The
+   * weaker mode still serialises writers to the account (no lost updates), but does not conflict
+   * with the {@code KEY SHARE} lock Postgres takes on an account whenever a row referencing it by
+   * foreign key is inserted. With {@code FOR UPDATE}, two withdrawals from one account deadlocked:
+   * each held a KEY SHARE from inserting its transaction row and then waited for the other's to
+   * take FOR UPDATE.
    */
   List<Account> lockForUpdate(UUID tenantId, Collection<UUID> accountIds);
 

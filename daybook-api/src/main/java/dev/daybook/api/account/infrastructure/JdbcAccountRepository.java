@@ -71,7 +71,7 @@ class JdbcAccountRepository implements AccountRepository {
                  FROM accounts
                 WHERE tenant_id = :tenantId AND id IN (:ids)
                 ORDER BY id
-                  FOR UPDATE
+                  FOR NO KEY UPDATE
                 """)
         .param("tenantId", tenantId)
         .param("ids", accountIds)

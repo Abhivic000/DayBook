@@ -11,6 +11,7 @@ import org.jspecify.annotations.Nullable;
  * @param customerAccountId for PSP transactions, the customer's account — recorded on the
  *     transaction because a PENDING top-up has no entries yet to say where the money goes
  * @param pspReference the idempotency reference sent to the PSP (this transaction's id)
+ * @param reversesTransactionId for a REVERSAL, the transaction it undoes (ADR 0003)
  */
 public record Transaction(
     UUID id,
@@ -19,7 +20,8 @@ public record Transaction(
     TransactionStatus status,
     Money amount,
     @Nullable UUID customerAccountId,
-    @Nullable String pspReference) {
+    @Nullable String pspReference,
+    @Nullable UUID reversesTransactionId) {
 
   public Transaction {
     Objects.requireNonNull(id, "id");
@@ -30,11 +32,15 @@ public record Transaction(
     if (!amount.isPositive()) {
       throw new IllegalArgumentException("Transaction amount must be positive");
     }
+    if ((type == TransactionType.REVERSAL) != (reversesTransactionId != null)) {
+      throw new IllegalArgumentException(
+          "Exactly the REVERSAL type references a reversed transaction");
+    }
   }
 
   /** An internal transaction that settles immediately (transfer, funding). */
   public static Transaction settled(UUID id, UUID tenantId, TransactionType type, Money amount) {
-    return new Transaction(id, tenantId, type, TransactionStatus.SETTLED, amount, null, null);
+    return new Transaction(id, tenantId, type, TransactionStatus.SETTLED, amount, null, null, null);
   }
 
   /**
@@ -50,7 +56,24 @@ public record Transaction(
         TransactionStatus.PENDING,
         amount,
         Objects.requireNonNull(customerAccountId, "customerAccountId"),
-        id.toString());
+        id.toString(),
+        null);
+  }
+
+  /**
+   * A compensating transaction undoing {@code original} (ADR 0003). The original is never edited;
+   * the database allows at most one reversal per original.
+   */
+  public static Transaction reversalOf(UUID id, Transaction original) {
+    return new Transaction(
+        id,
+        original.tenantId(),
+        TransactionType.REVERSAL,
+        TransactionStatus.SETTLED,
+        original.amount(),
+        original.customerAccountId(),
+        null,
+        original.id());
   }
 
   public boolean isPending() {

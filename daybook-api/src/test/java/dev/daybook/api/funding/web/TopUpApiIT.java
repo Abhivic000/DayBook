@@ -127,7 +127,7 @@ class TopUpApiIT {
     // The PSP takes longer than our read timeout: it may well have taken the money.
     psp.stubFor(
         post(urlEqualTo("/v1/payments"))
-            .willReturn(okPayment(201, "SUCCEEDED").withFixedDelay(1_500)));
+            .willReturn(okPayment(201, "SUCCEEDED").withFixedDelay(3_000)));
     Tenant tenant = api.createTenant();
     UUID account = api.createAccount(tenant);
 

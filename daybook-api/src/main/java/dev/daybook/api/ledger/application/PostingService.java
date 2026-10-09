@@ -58,12 +58,32 @@ public class PostingService {
   @Transactional(propagation = Propagation.MANDATORY)
   public Transaction post(
       UUID tenantId, TransactionType type, Posting posting, Consumer<Map<UUID, Account>> guard) {
-    Locked locked = lockAndApply(tenantId, posting, guard);
-    Transaction transaction =
-        Transaction.settled(UUID.randomUUID(), tenantId, type, posting.amount());
+    return post(
+        Transaction.settled(UUID.randomUUID(), tenantId, type, posting.amount()), posting, guard);
+  }
+
+  /** Posts a new, already-built SETTLED transaction (e.g. a reversal) with {@code posting}. */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public Transaction post(
+      Transaction transaction, Posting posting, Consumer<Map<UUID, Account>> guard) {
+    Locked locked = lockAndApply(transaction.tenantId(), posting, guard);
     transactions.insert(transaction);
     persist(transaction, posting, locked);
     return transaction;
+  }
+
+  /**
+   * Posts entries to a transaction that stays PENDING — e.g. a withdrawal's hold (ADR 0006), which
+   * must take the money from the user before the PSP is asked to pay it out.
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void postToPending(
+      Transaction pending, Posting posting, Consumer<Map<UUID, Account>> guard) {
+    if (!pending.isPending()) {
+      throw new IllegalStateException("Transaction %s is not PENDING".formatted(pending.id()));
+    }
+    Locked locked = lockAndApply(pending.tenantId(), posting, guard);
+    persist(pending, posting, locked);
   }
 
   /**

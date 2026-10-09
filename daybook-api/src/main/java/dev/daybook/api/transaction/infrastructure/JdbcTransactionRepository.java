@@ -24,8 +24,10 @@ class JdbcTransactionRepository implements TransactionRepository {
     jdbc.sql(
             """
             INSERT INTO transactions
-                (id, tenant_id, type, status, amount_minor, customer_account_id, psp_reference)
-            VALUES (:id, :tenantId, :type, :status, :amount, :customerAccountId, :pspReference)
+                (id, tenant_id, type, status, amount_minor, customer_account_id, psp_reference,
+                 reverses_transaction_id)
+            VALUES (:id, :tenantId, :type, :status, :amount, :customerAccountId, :pspReference,
+                    :reverses)
             """)
         .param("id", transaction.id())
         .param("tenantId", transaction.tenantId())
@@ -34,6 +36,7 @@ class JdbcTransactionRepository implements TransactionRepository {
         .param("amount", transaction.amount().minor())
         .param("customerAccountId", transaction.customerAccountId())
         .param("pspReference", transaction.pspReference())
+        .param("reverses", transaction.reversesTransactionId())
         .update();
   }
 
@@ -41,10 +44,11 @@ class JdbcTransactionRepository implements TransactionRepository {
   public Optional<Transaction> lockForUpdate(UUID tenantId, UUID transactionId) {
     return jdbc.sql(
             """
-            SELECT id, tenant_id, type, status, amount_minor, customer_account_id, psp_reference
+            SELECT id, tenant_id, type, status, amount_minor, customer_account_id, psp_reference,
+                   reverses_transaction_id
               FROM transactions
              WHERE tenant_id = :tenantId AND id = :id
-               FOR UPDATE
+               FOR NO KEY UPDATE
             """)
         .param("tenantId", tenantId)
         .param("id", transactionId)
@@ -57,7 +61,8 @@ class JdbcTransactionRepository implements TransactionRepository {
                     TransactionStatus.valueOf(rs.getString("status")),
                     Money.ofMinor(rs.getLong("amount_minor")),
                     rs.getObject("customer_account_id", UUID.class),
-                    rs.getString("psp_reference")))
+                    rs.getString("psp_reference"),
+                    rs.getObject("reverses_transaction_id", UUID.class)))
         .optional();
   }
 
