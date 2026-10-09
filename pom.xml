@@ -20,6 +20,7 @@
     <modules>
         <module>daybook-api</module>
         <module>daybook-consumer</module>
+        <module>daybook-psp-sim</module>
     </modules>
 
     <properties>
