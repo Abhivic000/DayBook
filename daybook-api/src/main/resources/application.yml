@@ -53,3 +53,12 @@ management:
       # Exposes /actuator/health/liveness and /actuator/health/readiness (FR-11.5).
       probes:
         enabled: true
+      group:
+        # Readiness = "send me traffic": the database is essential, Kafka is deliberately NOT
+        # included — the outbox lets the API keep serving through a Kafka outage (ADR 0014).
+        readiness:
+          include: readinessState,db
+          show-components: always
+        # Liveness = "restart me": never depends on the database; a restart cannot fix it.
+        liveness:
+          include: livenessState

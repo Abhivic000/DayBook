@@ -45,3 +45,11 @@ management:
     health:
       probes:
         enabled: true
+      group:
+        # Database only, as in the API (ADR 0014). If Kafka is down the consumer simply waits;
+        # consumer lag (Phase 5 metric) is the signal for that, not readiness.
+        readiness:
+          include: readinessState,db
+          show-components: always
+        liveness:
+          include: livenessState
