@@ -26,15 +26,15 @@ public record Account(
     Objects.requireNonNull(type, "type");
     Objects.requireNonNull(balance, "balance");
     Objects.requireNonNull(status, "status");
-    if (type == AccountType.USER && allowNegative) {
-      throw new IllegalArgumentException("USER accounts cannot allow a negative balance");
+    if (allowNegative && !type.mayGoNegative()) {
+      throw new IllegalArgumentException(type + " accounts cannot allow a negative balance");
     }
   }
 
-  /** A new, empty account of the given type. Only system types may go negative. */
+  /** A new, empty account of the given type, allowed to go negative only if its type may. */
   public static Account open(UUID id, UUID tenantId, AccountType type) {
     return new Account(
-        id, tenantId, type, Money.ZERO, 0, type != AccountType.USER, AccountStatus.ACTIVE);
+        id, tenantId, type, Money.ZERO, 0, type.mayGoNegative(), AccountStatus.ACTIVE);
   }
 
   public Account debit(Money amount) {

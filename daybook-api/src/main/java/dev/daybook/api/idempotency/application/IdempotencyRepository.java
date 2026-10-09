@@ -21,6 +21,12 @@ public interface IdempotencyRepository {
 
   void complete(UUID tenantId, String key, IdempotentResponse response);
 
+  /** Records which transaction an IN_PROGRESS key started (two-phase requests). */
+  void linkTransaction(UUID tenantId, String key, UUID transactionId);
+
+  /** Deletes an IN_PROGRESS key, so the request can be retried with it as if never made. */
+  void release(UUID tenantId, String key);
+
   /** Deletes records past their expiry and returns how many were removed (FR-5.7). */
   int deleteExpired();
 }

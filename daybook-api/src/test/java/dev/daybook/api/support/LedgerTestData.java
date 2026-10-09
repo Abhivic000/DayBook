@@ -28,14 +28,22 @@ public class LedgerTestData {
     this.funding = funding;
   }
 
-  /** A new tenant with its TREASURY account. */
+  /** A new tenant with all its system accounts, as tenant provisioning creates them. */
   public UUID newTenant() {
     UUID tenantId = UUID.randomUUID();
     jdbc.sql("INSERT INTO tenants (id, name) VALUES (?, ?)")
         .params(tenantId, "tenant-" + tenantId)
         .update();
-    accounts.insert(Account.open(UUID.randomUUID(), tenantId, AccountType.TREASURY));
+    for (AccountType type : AccountType.values()) {
+      if (type.isSystem()) {
+        accounts.insert(Account.open(UUID.randomUUID(), tenantId, type));
+      }
+    }
     return tenantId;
+  }
+
+  public UUID systemAccountOf(UUID tenantId, AccountType type) {
+    return accounts.findSystemAccount(tenantId, type).orElseThrow().id();
   }
 
   public UUID newUserAccount(UUID tenantId) {

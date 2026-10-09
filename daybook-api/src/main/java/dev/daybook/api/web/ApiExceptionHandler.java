@@ -2,6 +2,7 @@ package dev.daybook.api.web;
 
 import dev.daybook.api.common.domain.DomainException;
 import dev.daybook.api.common.domain.NotFoundException;
+import dev.daybook.api.funding.application.PspUnavailableException;
 import dev.daybook.api.idempotency.domain.IdempotencyRequestInProgressException;
 import dev.daybook.api.statement.application.StatementUnavailableException;
 import java.util.List;
@@ -47,6 +48,16 @@ class ApiExceptionHandler {
   @ExceptionHandler(NotFoundException.class)
   ResponseEntity<ProblemBody> notFound(NotFoundException e) {
     return respond(Problems.of(HttpStatus.NOT_FOUND, "not-found", e.getMessage()));
+  }
+
+  @ExceptionHandler(PspUnavailableException.class)
+  ResponseEntity<ProblemBody> pspUnavailable(PspUnavailableException e) {
+    return respond(
+        Problems.of(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "psp-unavailable",
+            "The payment provider is unavailable; nothing was charged. Retry later with the same"
+                + " Idempotency-Key. Transfers between accounts are unaffected."));
   }
 
   @ExceptionHandler(StatementUnavailableException.class)

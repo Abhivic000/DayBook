@@ -123,12 +123,31 @@ class SchemaConstraintsIT {
   }
 
   @Test
-  void userAccountCannotBeConfiguredToAllowNegative() {
+  void userAndInTransitAccountsCannotBeConfiguredToAllowNegative() {
     UUID tenant = newTenant();
 
     assertThatThrownBy(() -> newAccount(tenant, "USER", true))
         .rootCause()
-        .hasMessageContaining("accounts_user_not_negative_check");
+        .hasMessageContaining("accounts_never_negative_types_check");
+    assertThatThrownBy(() -> newAccount(tenant, "WITHDRAWAL_IN_TRANSIT", true))
+        .rootCause()
+        .hasMessageContaining("accounts_never_negative_types_check");
+  }
+
+  // --- Transaction status is final once decided (V7) -------------------------------------------
+
+  @Test
+  void settledOrFailedTransactionCannotChangeStatus() {
+    UUID tenant = newTenant();
+    UUID settled = newTransaction(tenant, 100); // inserted as SETTLED
+
+    assertThatThrownBy(
+            () ->
+                jdbc.sql("UPDATE transactions SET status = 'FAILED' WHERE id = ?")
+                    .param(settled)
+                    .update())
+        .rootCause()
+        .hasMessageContaining("is SETTLED and final");
   }
 
   @Test

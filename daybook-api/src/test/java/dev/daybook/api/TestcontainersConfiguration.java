@@ -1,5 +1,6 @@
 package dev.daybook.api;
 
+import java.time.Duration;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
@@ -27,6 +28,9 @@ public class TestcontainersConfiguration {
    */
   static final PostgreSQLContainer POSTGRES =
       new PostgreSQLContainer(DockerImageName.parse("postgres:16"))
+          // Default 60s is too tight on a busy Docker host (seen locally); a slow start is not a
+          // failure.
+          .withStartupTimeout(Duration.ofMinutes(3))
           .withCommand("postgres", "-c", "max_connections=300");
 
   static final KafkaContainer KAFKA =

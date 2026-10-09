@@ -66,7 +66,8 @@ class JdbcIdempotencyRepository implements IdempotencyRepository {
                 """
                 UPDATE idempotency_keys
                    SET status = 'COMPLETED', response_status = :status,
-                       response_body = :body, transaction_id = :transactionId
+                       response_body = :body,
+                       transaction_id = COALESCE(:transactionId, transaction_id)
                  WHERE tenant_id = :tenantId AND idempotency_key = :key
                    AND status = 'IN_PROGRESS'
                 """)
@@ -79,6 +80,31 @@ class JdbcIdempotencyRepository implements IdempotencyRepository {
     if (updated != 1) {
       throw new IllegalStateException("Idempotency key %s was not IN_PROGRESS".formatted(key));
     }
+  }
+
+  @Override
+  public void linkTransaction(UUID tenantId, String key, UUID transactionId) {
+    jdbc.sql(
+            """
+            UPDATE idempotency_keys SET transaction_id = :transactionId
+             WHERE tenant_id = :tenantId AND idempotency_key = :key AND status = 'IN_PROGRESS'
+            """)
+        .param("transactionId", transactionId)
+        .param("tenantId", tenantId)
+        .param("key", key)
+        .update();
+  }
+
+  @Override
+  public void release(UUID tenantId, String key) {
+    jdbc.sql(
+            """
+            DELETE FROM idempotency_keys
+             WHERE tenant_id = :tenantId AND idempotency_key = :key AND status = 'IN_PROGRESS'
+            """)
+        .param("tenantId", tenantId)
+        .param("key", key)
+        .update();
   }
 
   @Override

@@ -1,5 +1,6 @@
 package dev.daybook.consumer;
 
+import java.time.Duration;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -21,7 +22,10 @@ import org.testcontainers.utility.DockerImageName;
 public class TestcontainersConfiguration {
 
   static final PostgreSQLContainer POSTGRES =
-      new PostgreSQLContainer(DockerImageName.parse("postgres:16"));
+      new PostgreSQLContainer(DockerImageName.parse("postgres:16"))
+          // Default 60s is too tight on a busy Docker host (seen locally); a slow start is not a
+          // failure.
+          .withStartupTimeout(Duration.ofMinutes(3));
 
   static final KafkaContainer KAFKA =
       new KafkaContainer(DockerImageName.parse("apache/kafka:4.3.1"));

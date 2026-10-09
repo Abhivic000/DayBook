@@ -21,8 +21,8 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The single path by which money moves. Every use case (transfer, funding, later top-up and
- * withdrawal) posts through here, so locking, checks and persistence are written once.
+ * The single path by which money moves. Every use case (transfer, funding, top-up, withdrawal)
+ * posts through here, so locking, checks and persistence are written once.
  */
 @Service
 public class PostingService {
@@ -47,7 +47,7 @@ public class PostingService {
   }
 
   /**
-   * Posts a settled transaction.
+   * Posts a new transaction that settles immediately.
    *
    * <p>{@code MANDATORY}: the caller must already have opened the database transaction, because the
    * caller's own writes (e.g. the idempotency record) must commit or roll back together with these.
@@ -58,6 +58,33 @@ public class PostingService {
   @Transactional(propagation = Propagation.MANDATORY)
   public Transaction post(
       UUID tenantId, TransactionType type, Posting posting, Consumer<Map<UUID, Account>> guard) {
+    Locked locked = lockAndApply(tenantId, posting, guard);
+    Transaction transaction =
+        Transaction.settled(UUID.randomUUID(), tenantId, type, posting.amount());
+    transactions.insert(transaction);
+    persist(transaction, posting, locked);
+    return transaction;
+  }
+
+  /**
+   * Settles an existing PENDING transaction with {@code posting} — e.g. a top-up the PSP has
+   * confirmed. The caller must hold the transaction's row lock and have checked it is PENDING.
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void settlePending(
+      Transaction pending, Posting posting, Consumer<Map<UUID, Account>> guard) {
+    if (!pending.isPending()) {
+      throw new IllegalStateException("Transaction %s is not PENDING".formatted(pending.id()));
+    }
+    Locked locked = lockAndApply(pending.tenantId(), posting, guard);
+    transactions.markSettled(pending.id());
+    persist(pending, posting, locked);
+  }
+
+  /** The accounts as locked, and the result of applying the posting to them in memory. */
+  private record Locked(List<Account> accounts, Ledger.Result applied) {}
+
+  private Locked lockAndApply(UUID tenantId, Posting posting, Consumer<Map<UUID, Account>> guard) {
     if (posting.amount().compareTo(maxAmount) > 0) {
       throw new AmountLimitExceededException(posting.amount(), maxAmount);
     }
@@ -75,20 +102,20 @@ public class PostingService {
 
     // 2. Check and apply in memory. Every business rejection is thrown here, before any write.
     guard.accept(byId);
-    Ledger.Result applied = Ledger.applyWithTrail(posting, locked);
+    return new Locked(locked, Ledger.applyWithTrail(posting, locked));
+  }
 
-    // 3. Write: transaction, entries, balances, and one outbox event per entry. Commit makes all
-    //    of it visible at once — an event can never exist without its entry, or vice versa.
-    //    The events are written while the account locks are still held, so for each account the
-    //    outbox order matches the commit order (ADR 0010).
-    Transaction transaction =
-        Transaction.settled(UUID.randomUUID(), tenantId, type, posting.amount());
-    transactions.insert(transaction);
+  /**
+   * 3. Write entries, balances, and one outbox event per entry. Commit makes all of it visible at
+   * once — an event can never exist without its entry, or vice versa. The events are written while
+   * the account locks are still held, so for each account the outbox order matches the commit order
+   * (ADR 0010).
+   */
+  private void persist(Transaction transaction, Posting posting, Locked locked) {
     entries.insert(transaction, posting);
-    for (Account before : locked) {
-      accounts.updateBalance(applied.accounts().get(before.id()), before.version());
+    for (Account before : locked.accounts()) {
+      accounts.updateBalance(locked.applied().accounts().get(before.id()), before.version());
     }
-    events.record(transaction, applied.trail());
-    return transaction;
+    events.record(transaction, locked.applied().trail());
   }
 }

@@ -52,16 +52,82 @@ public class IdempotencyService {
       String requestHash,
       Supplier<IdempotentResponse> action,
       Function<DomainException, IdempotentResponse> onRejection) {
-    if (key.isBlank() || key.length() > 255) {
-      throw new IllegalArgumentException("Idempotency key must be 1-255 characters");
-    }
-
+    requireValidKey(key);
     if (repository.tryClaim(tenantId, key, requestHash, properties.retention())) {
       IdempotentResponse response = runOnce(action, onRejection);
       repository.complete(tenantId, key, response);
       return new IdempotentResult(response, false);
     }
+    return replayExisting(tenantId, key, requestHash);
+  }
 
+  /** How a two-phase request's first phase ended. */
+  public sealed interface Begun {
+
+    /** The key already had a final answer: return it, do nothing else. */
+    record Replay(IdempotentResult result) implements Begun {}
+
+    /** A business rule rejected the request before anything started; the answer is stored. */
+    record Rejected(IdempotentResponse response) implements Begun {}
+
+    /** The operation started: the key stays IN_PROGRESS, linked to this transaction. */
+    record Started(UUID transactionId) implements Begun {}
+  }
+
+  /**
+   * Phase one of a two-phase request (ADR 0017): claims the key and runs {@code start} — which
+   * records the PENDING transaction — in one database transaction that commits before the caller
+   * contacts the PSP. The key then stays IN_PROGRESS until {@link #complete} or {@link #release}; a
+   * concurrent retry meanwhile gets 409.
+   *
+   * @param start validates and records the operation, returning its transaction id
+   * @throws IdempotencyKeyReusedException the key was used with a different request
+   * @throws IdempotencyRequestInProgressException the original request has no final answer yet
+   */
+  @Transactional
+  public Begun begin(
+      UUID tenantId,
+      String key,
+      String requestHash,
+      Supplier<UUID> start,
+      Function<DomainException, IdempotentResponse> onRejection) {
+    requireValidKey(key);
+    if (!repository.tryClaim(tenantId, key, requestHash, properties.retention())) {
+      return new Begun.Replay(replayExisting(tenantId, key, requestHash));
+    }
+    try {
+      UUID transactionId = savepoint.execute(status -> start.get());
+      repository.linkTransaction(tenantId, key, transactionId);
+      return new Begun.Started(transactionId);
+    } catch (DomainException rejection) {
+      IdempotentResponse response = onRejection.apply(rejection);
+      repository.complete(tenantId, key, response);
+      return new Begun.Rejected(response);
+    }
+  }
+
+  /** Phase two: stores the request's answer under its key. */
+  @Transactional
+  public void complete(UUID tenantId, String key, IdempotentResponse response) {
+    repository.complete(tenantId, key, response);
+  }
+
+  /**
+   * Phase two when the request provably had no effect (e.g. the PSP never received it): forgets the
+   * key, so the client may retry with it as though the first attempt never happened.
+   */
+  @Transactional
+  public void release(UUID tenantId, String key) {
+    repository.release(tenantId, key);
+  }
+
+  private static void requireValidKey(String key) {
+    if (key.isBlank() || key.length() > 255) {
+      throw new IllegalArgumentException("Idempotency key must be 1-255 characters");
+    }
+  }
+
+  private IdempotentResult replayExisting(UUID tenantId, String key, String requestHash) {
     IdempotencyRecord existing =
         repository
             .find(tenantId, key)

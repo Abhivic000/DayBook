@@ -36,7 +36,11 @@ public class TenantService {
   public ProvisionedTenant create(String name) {
     UUID tenantId = UUID.randomUUID();
     tenants.insert(tenantId, name);
-    accounts.insert(Account.open(UUID.randomUUID(), tenantId, AccountType.TREASURY));
+    for (AccountType type : AccountType.values()) {
+      if (type.isSystem()) {
+        accounts.insert(Account.open(UUID.randomUUID(), tenantId, type));
+      }
+    }
     ApiKeys.Generated key = ApiKeys.generate();
     apiKeys.insert(tenantId, key.keyId(), key.secretHash());
     return new ProvisionedTenant(tenantId, name, key.plaintext());
