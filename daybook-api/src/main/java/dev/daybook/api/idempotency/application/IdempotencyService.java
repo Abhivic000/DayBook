@@ -113,6 +113,15 @@ public class IdempotencyService {
   }
 
   /**
+   * Gives a stranded key — left IN_PROGRESS by a crash between a request's two phases — its final
+   * answer once the transaction it started is resolved. Keys with an answer are untouched.
+   */
+  @Transactional
+  public void completeStranded(UUID tenantId, UUID transactionId, IdempotentResponse response) {
+    repository.completeInProgressForTransaction(tenantId, transactionId, response);
+  }
+
+  /**
    * Phase two when the request provably had no effect (e.g. the PSP never received it): forgets the
    * key, so the client may retry with it as though the first attempt never happened.
    */

@@ -76,6 +76,54 @@ class HttpPspGateway implements PspGateway {
     }
   }
 
+  /**
+   * Status lookups go through the same circuit breaker and bulkhead — a down PSP is down for both —
+   * but are not retried here: the sweeper simply asks again on its next run.
+   */
+  @Override
+  public PaymentStatus paymentStatus(String reference) {
+    Supplier<PaymentStatus> lookup =
+        CircuitBreaker.decorateSupplier(
+            breaker, Bulkhead.decorateSupplier(bulkhead, () -> fetchStatus(reference)));
+    try {
+      return lookup.get();
+    } catch (CallNotPermittedException e) {
+      return new PaymentStatus.Unavailable("circuit breaker open");
+    } catch (BulkheadFullException e) {
+      return new PaymentStatus.Unavailable("too many concurrent PSP calls");
+    } catch (PspNotAcceptedException | PspUnknownOutcomeException e) {
+      return new PaymentStatus.Unavailable(e.getMessage());
+    }
+  }
+
+  private PaymentStatus fetchStatus(String reference) {
+    try {
+      return http.get()
+          .uri("/v1/payments/{reference}", reference)
+          .exchange(
+              (request, response) -> {
+                int status = response.getStatusCode().value();
+                if (status == 200) {
+                  PaymentResponse payment = response.bodyTo(PaymentResponse.class);
+                  String paymentStatus = payment == null ? null : payment.status();
+                  if ("SUCCEEDED".equals(paymentStatus)) {
+                    return new PaymentStatus.Succeeded();
+                  }
+                  if ("DECLINED".equals(paymentStatus)) {
+                    return new PaymentStatus.Declined();
+                  }
+                  throw new PspUnknownOutcomeException("Unrecognised PSP status " + paymentStatus);
+                }
+                if (status == 404) {
+                  return new PaymentStatus.NotFound(); // a valid answer, not a PSP failure
+                }
+                throw new PspUnknownOutcomeException("PSP status lookup answered " + status);
+              });
+    } catch (ResourceAccessException e) {
+      throw new PspUnknownOutcomeException("PSP status lookup failed: " + e.getMessage());
+    }
+  }
+
   private Outcome send(String reference, Direction direction, Money amount) {
     try {
       return http.post()

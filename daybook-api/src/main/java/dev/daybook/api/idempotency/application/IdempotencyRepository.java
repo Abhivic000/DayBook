@@ -24,6 +24,13 @@ public interface IdempotencyRepository {
   /** Records which transaction an IN_PROGRESS key started (two-phase requests). */
   void linkTransaction(UUID tenantId, String key, UUID transactionId);
 
+  /**
+   * Completes the IN_PROGRESS key (if any) that started {@code transactionId}. Keys that already
+   * have an answer are left alone: a key's first answer is final (ADR 0017).
+   */
+  void completeInProgressForTransaction(
+      UUID tenantId, UUID transactionId, IdempotentResponse response);
+
   /** Deletes an IN_PROGRESS key, so the request can be retried with it as if never made. */
   void release(UUID tenantId, String key);
 

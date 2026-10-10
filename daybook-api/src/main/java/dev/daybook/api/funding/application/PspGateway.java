@@ -39,11 +39,33 @@ public interface PspGateway {
     record Unknown(String reason) implements Outcome {}
   }
 
+  /** What the PSP says about an earlier payment request (ADR 0016). */
+  sealed interface PaymentStatus {
+
+    /** The PSP moved the money. */
+    record Succeeded() implements PaymentStatus {}
+
+    /** The PSP definitively refused. */
+    record Declined() implements PaymentStatus {}
+
+    /**
+     * The PSP has no payment with this reference. Not proof it never will (the request may have
+     * been lost, or the PSP may have lost state), so it is not treated as a failure.
+     */
+    record NotFound() implements PaymentStatus {}
+
+    /** The PSP could not be asked right now. */
+    record Unavailable(String reason) implements PaymentStatus {}
+  }
+
   /**
    * Asks the PSP to move money. {@code reference} is the PSP's idempotency key: repeating it can
    * never move money twice.
    */
   Outcome createPayment(String reference, Direction direction, Money amount);
+
+  /** Looks up an earlier payment by its reference. Read-only, so always safe to repeat. */
+  PaymentStatus paymentStatus(String reference);
 
   /** False while the circuit breaker is open: callers should fail fast without writing anything. */
   boolean acceptingRequests();

@@ -30,6 +30,13 @@ spring:
     problemdetails:
       # RFC 9457 bodies for framework errors not covered by ApiExceptionHandler.
       enabled: true
+  task:
+    scheduling:
+      pool:
+        # Spring runs all @Scheduled jobs on ONE thread by default. The sweeper makes PSP calls
+        # that can each take seconds; on a shared single thread it would stall the outbox relay
+        # (every 200ms) and delay every event.
+        size: 4
 
 daybook:
   security:

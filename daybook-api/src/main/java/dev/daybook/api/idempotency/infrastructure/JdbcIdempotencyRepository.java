@@ -96,6 +96,23 @@ class JdbcIdempotencyRepository implements IdempotencyRepository {
   }
 
   @Override
+  public void completeInProgressForTransaction(
+      UUID tenantId, UUID transactionId, IdempotentResponse response) {
+    jdbc.sql(
+            """
+            UPDATE idempotency_keys
+               SET status = 'COMPLETED', response_status = :status, response_body = :body
+             WHERE tenant_id = :tenantId AND transaction_id = :transactionId
+               AND status = 'IN_PROGRESS'
+            """)
+        .param("status", response.status())
+        .param("body", response.body())
+        .param("tenantId", tenantId)
+        .param("transactionId", transactionId)
+        .update();
+  }
+
+  @Override
   public void release(UUID tenantId, String key) {
     jdbc.sql(
             """

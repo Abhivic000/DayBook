@@ -5,6 +5,9 @@ import dev.daybook.api.transaction.application.TransactionRepository;
 import dev.daybook.api.transaction.domain.Transaction;
 import dev.daybook.api.transaction.domain.TransactionStatus;
 import dev.daybook.api.transaction.domain.TransactionType;
+import java.time.Duration;
+import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -64,6 +67,38 @@ class JdbcTransactionRepository implements TransactionRepository {
                     rs.getString("psp_reference"),
                     rs.getObject("reverses_transaction_id", UUID.class)))
         .optional();
+  }
+
+  @Override
+  public List<PendingTransaction> findPendingWithPsp(Duration minAge, int limit) {
+    // Served by the partial index transactions_pending_idx (created_at) WHERE status = 'PENDING'.
+    return jdbc.sql(
+            """
+            SELECT id, tenant_id, type, status, amount_minor, customer_account_id, psp_reference,
+                   reverses_transaction_id, created_at
+              FROM transactions
+             WHERE status = 'PENDING'
+               AND type IN ('TOPUP', 'WITHDRAWAL')
+               AND created_at < now() - make_interval(secs => :minAgeSeconds)
+             ORDER BY created_at
+             LIMIT :limit
+            """)
+        .param("minAgeSeconds", minAge.toMillis() / 1000.0)
+        .param("limit", limit)
+        .query(
+            (rs, n) ->
+                new PendingTransaction(
+                    new Transaction(
+                        rs.getObject("id", UUID.class),
+                        rs.getObject("tenant_id", UUID.class),
+                        TransactionType.valueOf(rs.getString("type")),
+                        TransactionStatus.valueOf(rs.getString("status")),
+                        Money.ofMinor(rs.getLong("amount_minor")),
+                        rs.getObject("customer_account_id", UUID.class),
+                        rs.getString("psp_reference"),
+                        rs.getObject("reverses_transaction_id", UUID.class)),
+                    rs.getObject("created_at", OffsetDateTime.class).toInstant()))
+        .list();
   }
 
   @Override
