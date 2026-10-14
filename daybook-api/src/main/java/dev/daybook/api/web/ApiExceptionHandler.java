@@ -4,6 +4,7 @@ import dev.daybook.api.common.domain.DomainException;
 import dev.daybook.api.common.domain.NotFoundException;
 import dev.daybook.api.funding.application.PspUnavailableException;
 import dev.daybook.api.idempotency.domain.IdempotencyRequestInProgressException;
+import dev.daybook.api.reconciliation.application.ReconciliationInProgressException;
 import dev.daybook.api.statement.application.StatementUnavailableException;
 import java.util.List;
 import org.slf4j.Logger;
@@ -48,6 +49,11 @@ class ApiExceptionHandler {
   @ExceptionHandler(NotFoundException.class)
   ResponseEntity<ProblemBody> notFound(NotFoundException e) {
     return respond(Problems.of(HttpStatus.NOT_FOUND, "not-found", e.getMessage()));
+  }
+
+  @ExceptionHandler(ReconciliationInProgressException.class)
+  ResponseEntity<ProblemBody> reconciliationInProgress(ReconciliationInProgressException e) {
+    return respond(Problems.of(HttpStatus.CONFLICT, "reconciliation-in-progress", e.getMessage()));
   }
 
   @ExceptionHandler(PspUnavailableException.class)

@@ -12,10 +12,11 @@ import org.testcontainers.utility.DockerImageName;
  * Real PostgreSQL and Kafka in Docker for integration tests. {@code @ServiceConnection} points the
  * application at them, so tests need no connection settings.
  *
- * <p>The containers are static: one Postgres and one Kafka serve every test class in the run,
- * however many Spring contexts the tests create. {@code destroyMethod = ""} stops Spring from
- * shutting a shared container down when one context closes; Testcontainers removes them when the
- * test JVM exits. Tests stay independent by using a fresh tenant each.
+ * <p>The containers are static, so contexts that are alive at the same time share them. Note that
+ * Spring Boot stops a context's containers when that context closes (despite {@code destroyMethod =
+ * ""}), and the API tests keep only one context alive ({@code spring.properties}), so a new context
+ * generally starts on a fresh database. Tests therefore never rely on state from another class, and
+ * stay independent within a class by using a fresh tenant each.
  */
 @TestConfiguration(proxyBeanMethods = false)
 public class TestcontainersConfiguration {

@@ -21,14 +21,15 @@ public final class ProjectionSchema {
           Path.of("../daybook-consumer/src/main/resources/db/migration"), // Maven: module dir
           Path.of("daybook-consumer/src/main/resources/db/migration")); // IDE: project root
 
-  private static volatile boolean migrated;
-
   private ProjectionSchema() {}
 
+  /**
+   * Applies the consumer's migrations if they are missing. Always asks the database rather than
+   * remembering a flag: a new Spring test context can come with a brand-new database container, so
+   * "already migrated" is a fact about one database, not about the JVM. Flyway's migrate is a quick
+   * no-op when the schema is current.
+   */
   public static synchronized void ensureMigrated(DataSource dataSource) {
-    if (migrated) {
-      return;
-    }
     Path location =
         CANDIDATES.stream()
             .filter(Files::isDirectory)
@@ -44,6 +45,5 @@ public final class ProjectionSchema {
         .locations("filesystem:" + location.toAbsolutePath())
         .load()
         .migrate();
-    migrated = true;
   }
 }
