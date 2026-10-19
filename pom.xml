@@ -31,8 +31,12 @@
         <resilience4j.version>2.4.0</resilience4j.version>
         <wiremock.version>3.13.2</wiremock.version>
         <!-- Test JVMs run in UTC: server-side standard, and avoids legacy zone ids
-             (e.g. Asia/Calcutta) that newer Postgres builds reject at connect time. -->
-        <argLine>-Duser.timezone=UTC</argLine>
+             (e.g. Asia/Calcutta) that newer Postgres builds reject at connect time.
+             Mockito is loaded as a declared Java agent: the JDK warns about (and will later block)
+             agents that attach themselves at runtime. The jar path property is set by
+             dependency:properties below. -->
+        <!-- Quoted: the jar path may contain spaces (e.g. a Windows user name). -->
+        <test.argLine>-Duser.timezone=UTC "-javaagent:${org.mockito:mockito-core:jar}"</test.argLine>
     </properties>
 
     <build>
@@ -58,11 +62,35 @@
                 </configuration>
             </plugin>
 
+            <!-- Defines ${group:artifact:type} properties holding each dependency's jar path. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>properties</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <argLine>${test.argLine}</argLine>
+                </configuration>
+            </plugin>
+
             <!-- Failsafe runs *IT integration tests (real Postgres via Testcontainers) during `verify`.
                  Surefire keeps running fast *Test unit tests during `test`. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
+                <configuration>
+                    <argLine>${test.argLine}</argLine>
+                </configuration>
                 <executions>
                     <execution>
                         <goals>

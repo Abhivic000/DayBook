@@ -3,11 +3,14 @@ package dev.daybook.api.transfer.application;
 import dev.daybook.api.account.domain.Account;
 import dev.daybook.api.account.domain.AccountType;
 import dev.daybook.api.account.domain.AccountTypeNotAllowedException;
+import dev.daybook.api.common.metrics.AfterCommit;
 import dev.daybook.api.ledger.application.PostingService;
 import dev.daybook.api.ledger.domain.Posting;
 import dev.daybook.api.transaction.domain.Transaction;
 import dev.daybook.api.transaction.domain.TransactionType;
 import dev.daybook.api.transfer.domain.SameAccountTransferException;
+import io.micrometer.core.instrument.DistributionSummary;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,9 +19,18 @@ import org.springframework.transaction.annotation.Transactional;
 public class TransferService {
 
   private final PostingService postingService;
+  private final DistributionSummary amounts;
 
-  TransferService(PostingService postingService) {
+  TransferService(PostingService postingService, MeterRegistry registry) {
     this.postingService = postingService;
+    // FR-11.3: distribution of transfer sizes, as a histogram Prometheus can compute quantiles
+    // from.
+    this.amounts =
+        DistributionSummary.builder("daybook.transfer.amount")
+            .description("Settled transfer amounts")
+            .baseUnit("paise")
+            .publishPercentileHistogram()
+            .register(registry);
   }
 
   @Transactional
@@ -29,11 +41,17 @@ public class TransferService {
     if (!command.amount().isPositive()) {
       throw new IllegalArgumentException("Transfer amount must be positive");
     }
-    return postingService.post(
-        command.tenantId(),
-        TransactionType.TRANSFER,
-        Posting.move(command.fromAccountId(), command.toAccountId(), command.amount()),
-        locked -> locked.values().forEach(TransferService::requireUserAccount));
+    Transaction transaction =
+        postingService.post(
+            command.tenantId(),
+            TransactionType.TRANSFER,
+            Posting.move(command.fromAccountId(), command.toAccountId(), command.amount()),
+            locked -> locked.values().forEach(TransferService::requireUserAccount));
+    // Micrometer records doubles: exact for whole paise up to 2^53, and this is only a metric —
+    // the money path itself stays in long.
+    double recorded = (double) command.amount().minor();
+    AfterCommit.run(() -> amounts.record(recorded));
+    return transaction;
   }
 
   /**

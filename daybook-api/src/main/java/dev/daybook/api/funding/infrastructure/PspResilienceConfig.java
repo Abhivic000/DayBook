@@ -2,11 +2,18 @@ package dev.daybook.api.funding.infrastructure;
 
 import io.github.resilience4j.bulkhead.Bulkhead;
 import io.github.resilience4j.bulkhead.BulkheadConfig;
+import io.github.resilience4j.bulkhead.BulkheadRegistry;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.core.IntervalFunction;
+import io.github.resilience4j.micrometer.tagged.TaggedBulkheadMetrics;
+import io.github.resilience4j.micrometer.tagged.TaggedCircuitBreakerMetrics;
+import io.github.resilience4j.micrometer.tagged.TaggedRetryMetrics;
 import io.github.resilience4j.retry.Retry;
 import io.github.resilience4j.retry.RetryConfig;
+import io.github.resilience4j.retry.RetryRegistry;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import org.slf4j.Logger;
@@ -46,10 +53,14 @@ class PspResilienceConfig {
    * unavailable or unresponsive counts as failure.
    */
   @Bean
-  CircuitBreaker pspCircuitBreaker(PspProperties properties) {
+  CircuitBreaker pspCircuitBreaker(PspProperties properties, MeterRegistry meters) {
     PspProperties.CircuitBreaker settings = properties.circuitBreaker();
+    CircuitBreakerRegistry registry = CircuitBreakerRegistry.ofDefaults();
+    // FR-7.5, FR-11.3: state, call outcomes and failure rate, e.g.
+    // resilience4j_circuitbreaker_state.
+    TaggedCircuitBreakerMetrics.ofCircuitBreakerRegistry(registry).bindTo(meters);
     CircuitBreaker breaker =
-        CircuitBreaker.of(
+        registry.circuitBreaker(
             "psp",
             CircuitBreakerConfig.custom()
                 .slidingWindowType(CircuitBreakerConfig.SlidingWindowType.COUNT_BASED)
@@ -63,7 +74,7 @@ class PspResilienceConfig {
                     HttpPspGateway.PspNotAcceptedException.class,
                     HttpPspGateway.PspUnknownOutcomeException.class)
                 .build());
-    // FR-7.5: state changes are logged (metrics follow in Phase 5).
+    // FR-7.5: state changes are also logged, so they show up next to the requests they affect.
     breaker
         .getEventPublisher()
         .onStateTransition(event -> log.warn("PSP circuit breaker {}", event.getStateTransition()));
@@ -75,8 +86,10 @@ class PspResilienceConfig {
    * with random jitter, so many clients retrying at once do not hit the PSP in lockstep.
    */
   @Bean
-  Retry pspRetry(PspProperties properties) {
-    return Retry.of(
+  Retry pspRetry(PspProperties properties, MeterRegistry meters) {
+    RetryRegistry registry = RetryRegistry.ofDefaults();
+    TaggedRetryMetrics.ofRetryRegistry(registry).bindTo(meters);
+    return registry.retry(
         "psp",
         RetryConfig.custom()
             .maxAttempts(properties.retry().maxAttempts())
@@ -92,8 +105,10 @@ class PspResilienceConfig {
 
   /** At most N PSP calls in flight; further calls are refused at once, not queued. */
   @Bean
-  Bulkhead pspBulkhead(PspProperties properties) {
-    return Bulkhead.of(
+  Bulkhead pspBulkhead(PspProperties properties, MeterRegistry meters) {
+    BulkheadRegistry registry = BulkheadRegistry.ofDefaults();
+    TaggedBulkheadMetrics.ofBulkheadRegistry(registry).bindTo(meters);
+    return registry.bulkhead(
         "psp",
         BulkheadConfig.custom()
             .maxConcurrentCalls(properties.bulkhead().maxConcurrentCalls())

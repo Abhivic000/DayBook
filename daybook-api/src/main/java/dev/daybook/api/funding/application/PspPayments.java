@@ -8,6 +8,7 @@ import java.util.UUID;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
 
 /**
@@ -29,6 +30,14 @@ class PspPayments {
   }
 
   PspOperationResult execute(
+      UUID tenantId, UUID transactionId, PspGateway.Direction direction, Money amount) {
+    // Every log line about this PSP call — retries, breaker, outcome — names the transaction.
+    try (MDC.MDCCloseable ignored = MDC.putCloseable("transactionId", transactionId.toString())) {
+      return call(tenantId, transactionId, direction, amount);
+    }
+  }
+
+  private PspOperationResult call(
       UUID tenantId, UUID transactionId, PspGateway.Direction direction, Money amount) {
     PspGateway.Outcome outcome = psp.createPayment(transactionId.toString(), direction, amount);
     Outcome result =

@@ -54,7 +54,9 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        # prometheus: the scrape endpoint (FR-11.3). Unauthenticated like health — it carries no
+        # tenant data (no metric is tagged by tenant) and is meant for the internal network only.
+        include: health,info,prometheus
   endpoint:
     health:
       # Exposes /actuator/health/liveness and /actuator/health/readiness (FR-11.5).
@@ -69,3 +71,11 @@ management:
         # Liveness = "restart me": never depends on the database; a restart cannot fix it.
         liveness:
           include: livenessState
+  metrics:
+    tags:
+      # Every metric carries the app name, so one dashboard can tell API and consumer apart.
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        # Latency histograms, so Prometheus can compute p50/p95/p99 across instances (FR-11.3).
+        http.server.requests: true

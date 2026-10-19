@@ -158,15 +158,23 @@ class ReconciliationIT {
             """)
         .params(stuck, tenant.id(), account, stuck.toString())
         .update();
+    UUID fakeEvent = UUID.randomUUID();
     jdbc.sql(
             """
             INSERT INTO outbox_events (event_id, event_type, topic, message_key, payload, created_at)
             VALUES (?, 'Test', 'test', 'k', '{}', now() - interval '1 hour')
             """)
-        .param(UUID.randomUUID())
+        .param(fakeEvent)
         .update();
 
-    ReconciliationReport report = reconciliation.run(Trigger.ON_DEMAND);
+    ReconciliationReport report;
+    try {
+      report = reconciliation.run(Trigger.ON_DEMAND);
+    } finally {
+      // The test database is shared with later classes, whose relay would otherwise try to
+      // publish this fake event — and stop at it, blocking every real event behind it.
+      jdbc.sql("DELETE FROM outbox_events WHERE event_id = ?").param(fakeEvent).update();
+    }
 
     assertThat(violationsOf(report, tenant))
         .anyMatch(v -> v.check() == Check.STUCK_PENDING && stuck.equals(v.subjectId()));

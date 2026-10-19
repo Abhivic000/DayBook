@@ -61,7 +61,8 @@ class SecurityConfig {
             AnonymousAuthenticationFilter.class)
         .authorizeHttpRequests(
             auth ->
-                auth.requestMatchers("/actuator/health/**", "/actuator/info", "/error")
+                auth.requestMatchers(
+                        "/actuator/health/**", "/actuator/info", "/actuator/prometheus", "/error")
                     .permitAll()
                     // Served only when springdoc is enabled (non-production profiles).
                     .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")

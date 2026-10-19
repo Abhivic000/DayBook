@@ -72,7 +72,8 @@ class AdminSecurityConfig {
             new AdminKeyFilter(properties.adminKeySha256()), AnonymousAuthenticationFilter.class)
         .authorizeHttpRequests(
             auth ->
-                auth.requestMatchers("/actuator/health/**", "/actuator/info", "/error")
+                auth.requestMatchers(
+                        "/actuator/health/**", "/actuator/info", "/actuator/prometheus", "/error")
                     .permitAll()
                     .requestMatchers("/v1/admin/**")
                     .hasRole("ADMIN")

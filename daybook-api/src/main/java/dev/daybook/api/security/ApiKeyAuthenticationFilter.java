@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
+import org.slf4j.MDC;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -35,6 +36,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
 
   private static final String BEARER = "Bearer ";
+  private static final String MDC_TENANT_ID = "tenantId";
 
   private final ApiKeyRepository apiKeys;
   private final String adminKeySha256;
@@ -67,9 +69,14 @@ class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
     var context = SecurityContextHolder.createEmptyContext();
     context.setAuthentication(authentication.get());
     SecurityContextHolder.setContext(context);
+    // Every log line of this request names its tenant, so one tenant's problem can be filtered.
+    if (authentication.get().getPrincipal() instanceof TenantPrincipal tenant) {
+      MDC.put(MDC_TENANT_ID, tenant.tenantId().toString());
+    }
     try {
       chain.doFilter(request, response);
     } finally {
+      MDC.remove(MDC_TENANT_ID);
       SecurityContextHolder.clearContext();
     }
   }

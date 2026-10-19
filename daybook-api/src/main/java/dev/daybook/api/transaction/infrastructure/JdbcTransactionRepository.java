@@ -17,9 +17,11 @@ import org.springframework.stereotype.Repository;
 class JdbcTransactionRepository implements TransactionRepository {
 
   private final JdbcClient jdbc;
+  private final TransactionMetrics metrics;
 
-  JdbcTransactionRepository(JdbcClient jdbc) {
+  JdbcTransactionRepository(JdbcClient jdbc, TransactionMetrics metrics) {
     this.jdbc = jdbc;
+    this.metrics = metrics;
   }
 
   @Override
@@ -41,6 +43,7 @@ class JdbcTransactionRepository implements TransactionRepository {
         .param("pspReference", transaction.pspReference())
         .param("reverses", transaction.reversesTransactionId())
         .update();
+    metrics.reached(transaction.type(), transaction.status());
   }
 
   @Override
@@ -112,20 +115,24 @@ class JdbcTransactionRepository implements TransactionRepository {
   }
 
   private void resolve(UUID transactionId, String status, String reason) {
-    int updated =
+    String type =
         jdbc.sql(
                 """
                 UPDATE transactions
                    SET status = :status, failure_reason = :reason, updated_at = now()
                  WHERE id = :id AND status = 'PENDING'
+                RETURNING type
                 """)
             .param("status", status)
             .param("reason", reason)
             .param("id", transactionId)
-            .update();
-    if (updated != 1) {
-      throw new IllegalStateException(
-          "Transaction %s is not PENDING; cannot mark it %s".formatted(transactionId, status));
-    }
+            .query(String.class)
+            .optional()
+            .orElseThrow(
+                () ->
+                    new IllegalStateException(
+                        "Transaction %s is not PENDING; cannot mark it %s"
+                            .formatted(transactionId, status)));
+    metrics.reached(TransactionType.valueOf(type), TransactionStatus.valueOf(status));
   }
 }

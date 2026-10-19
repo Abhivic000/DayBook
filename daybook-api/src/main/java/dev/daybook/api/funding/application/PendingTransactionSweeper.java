@@ -11,6 +11,7 @@ import java.time.Instant;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 
 /**
@@ -89,6 +90,14 @@ public class PendingTransactionSweeper {
 
   /** Asks the PSP about one transaction and applies the answer. Never throws: one bad apple. */
   private TransactionStatus resolve(Transaction transaction) {
+    // The sweeper runs outside any request, so it sets the log context itself.
+    try (MDC.MDCCloseable tenant = MDC.putCloseable("tenantId", transaction.tenantId().toString());
+        MDC.MDCCloseable id = MDC.putCloseable("transactionId", transaction.id().toString())) {
+      return query(transaction);
+    }
+  }
+
+  private TransactionStatus query(Transaction transaction) {
     try {
       PspGateway.PaymentStatus answer = psp.paymentStatus(transaction.pspReference());
       TransactionStatus status =
