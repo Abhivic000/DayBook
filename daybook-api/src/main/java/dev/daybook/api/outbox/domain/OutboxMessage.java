@@ -9,6 +9,7 @@ import org.jspecify.annotations.Nullable;
  *
  * @param key the Kafka record key; records with the same key stay in order (one partition)
  * @param payload serialised body, published exactly as stored
+ * @param traceparent W3C trace context of the request that wrote it, continued when published
  */
 public record OutboxMessage(
     UUID eventId,
@@ -16,7 +17,8 @@ public record OutboxMessage(
     String topic,
     String key,
     String payload,
-    @Nullable String correlationId) {
+    @Nullable String correlationId,
+    @Nullable String traceparent) {
 
   public OutboxMessage {
     Objects.requireNonNull(eventId, "eventId");

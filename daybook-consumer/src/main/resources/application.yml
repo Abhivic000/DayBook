@@ -25,6 +25,12 @@ spring:
     listener:
       # Up to 3 partitions processed in parallel; each partition is still read in order.
       concurrency: 3
+      # Each record is processed inside a span continuing the trace from its traceparent header,
+      # i.e. the API request that caused it (FR-11.4).
+      observation-enabled: true
+    template:
+      # Dead-letter publishing keeps the trace too.
+      observation-enabled: true
 
   mvc:
     problemdetails:
@@ -55,6 +61,10 @@ management:
           show-components: always
         liveness:
           include: livenessState
+  tracing:
+    sampling:
+      # Applies only to traces this app starts; consumed records follow the API's decision.
+      probability: 0.1
   metrics:
     tags:
       # Every metric carries the app name, so one dashboard can tell API and consumer apart.

@@ -25,8 +25,8 @@ class JdbcOutboxRepository implements OutboxRepository {
     jdbc.sql(
             """
             INSERT INTO outbox_events
-                (event_id, event_type, topic, message_key, payload, correlation_id)
-            VALUES (:eventId, :eventType, :topic, :key, :payload, :correlationId)
+                (event_id, event_type, topic, message_key, payload, correlation_id, traceparent)
+            VALUES (:eventId, :eventType, :topic, :key, :payload, :correlationId, :traceparent)
             """)
         .param("eventId", message.eventId())
         .param("eventType", message.eventType())
@@ -34,6 +34,7 @@ class JdbcOutboxRepository implements OutboxRepository {
         .param("key", message.key())
         .param("payload", message.payload())
         .param("correlationId", message.correlationId())
+        .param("traceparent", message.traceparent())
         .update();
   }
 
@@ -49,7 +50,8 @@ class JdbcOutboxRepository implements OutboxRepository {
   public List<PendingMessage> fetchUnpublished(int limit) {
     return jdbc.sql(
             """
-            SELECT id, event_id, event_type, topic, message_key, payload, correlation_id
+            SELECT id, event_id, event_type, topic, message_key, payload, correlation_id,
+                   traceparent
               FROM outbox_events
              WHERE published_at IS NULL
              ORDER BY id
@@ -66,7 +68,8 @@ class JdbcOutboxRepository implements OutboxRepository {
                         rs.getString("topic"),
                         rs.getString("message_key"),
                         rs.getString("payload"),
-                        rs.getString("correlation_id"))))
+                        rs.getString("correlation_id"),
+                        rs.getString("traceparent"))))
         .list();
   }
 

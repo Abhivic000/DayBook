@@ -74,6 +74,19 @@
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-registry-prometheus</artifactId>
         </dependency>
+        <!-- Distributed tracing: Micrometer Tracing over OpenTelemetry, exported via OTLP (ADR 0019). -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-opentelemetry</artifactId>
+            <exclusions>
+                <!-- Metrics are scraped by Prometheus; an OTLP metrics push would only add a second
+                     path (and connection errors when no collector is running). -->
+                <exclusion>
+                    <groupId>io.micrometer</groupId>
+                    <artifactId>micrometer-registry-otlp</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-database-postgresql</artifactId>
@@ -92,6 +105,12 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-jdbc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- @AutoConfigureTracing: tests run with tracing off unless they ask for it. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-micrometer-tracing-test</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

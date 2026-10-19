@@ -14,10 +14,12 @@ import io.github.resilience4j.retry.Retry;
 import io.github.resilience4j.retry.RetryConfig;
 import io.github.resilience4j.retry.RetryRegistry;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.observation.ObservationRegistry;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
@@ -30,7 +32,8 @@ class PspResilienceConfig {
   private static final Logger log = LoggerFactory.getLogger(PspResilienceConfig.class);
 
   @Bean
-  RestClient pspRestClient(PspProperties properties) {
+  RestClient pspRestClient(
+      PspProperties properties, ObjectProvider<ObservationRegistry> observations) {
     // HTTP/1.1 explicitly: the JDK client otherwise attempts an HTTP/2 upgrade over plain http,
     // which some servers accept and then cancel ("RST_STREAM") — every call would then look like
     // an unknown outcome. A request/response payments API gains nothing from HTTP/2.
@@ -43,6 +46,9 @@ class PspResilienceConfig {
     requestFactory.setReadTimeout(properties.readTimeout());
     return RestClient.builder()
         .baseUrl(properties.baseUrl())
+        // Each PSP attempt becomes a client span and an http.client.requests timer, tagged with
+        // the URI template (/v1/payments/{reference}), never the per-payment URL.
+        .observationRegistry(observations.getIfAvailable(() -> ObservationRegistry.NOOP))
         .requestFactory(requestFactory)
         .build();
   }

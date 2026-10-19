@@ -26,6 +26,9 @@ spring:
         max.block.ms: 5000
         request.timeout.ms: 5000
         delivery.timeout.ms: 15000
+    template:
+      # Each send becomes a producer span and adds a W3C traceparent header for the consumer.
+      observation-enabled: true
   mvc:
     problemdetails:
       # RFC 9457 bodies for framework errors not covered by ApiExceptionHandler.
@@ -71,6 +74,12 @@ management:
         # Liveness = "restart me": never depends on the database; a restart cannot fix it.
         liveness:
           include: livenessState
+  tracing:
+    sampling:
+      # Share of traces kept. 10% is a production-style default; Docker Compose sets 1.0 so every
+      # request can be inspected. Spans are exported only when
+      # management.opentelemetry.tracing.export.otlp.endpoint is set (ADR 0019).
+      probability: 0.1
   metrics:
     tags:
       # Every metric carries the app name, so one dashboard can tell API and consumer apart.

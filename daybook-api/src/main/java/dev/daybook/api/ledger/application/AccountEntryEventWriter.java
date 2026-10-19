@@ -1,6 +1,7 @@
 package dev.daybook.api.ledger.application;
 
 import dev.daybook.api.account.domain.Account;
+import dev.daybook.api.common.tracing.TraceParents;
 import dev.daybook.api.common.web.CorrelationIdFilter;
 import dev.daybook.api.ledger.domain.Ledger;
 import dev.daybook.api.outbox.application.OutboxRepository;
@@ -22,19 +23,26 @@ class AccountEntryEventWriter {
   private final JsonMapper json;
   private final Clock clock;
   private final LedgerEventProperties properties;
+  private final TraceParents traces;
 
   AccountEntryEventWriter(
-      OutboxRepository outbox, JsonMapper json, Clock clock, LedgerEventProperties properties) {
+      OutboxRepository outbox,
+      JsonMapper json,
+      Clock clock,
+      LedgerEventProperties properties,
+      TraceParents traces) {
     this.outbox = outbox;
     this.json = json;
     this.clock = clock;
     this.properties = properties;
+    this.traces = traces;
   }
 
   /** Must run in the same database transaction that posted the entries. */
   void record(Transaction transaction, List<Ledger.AppliedEntry> trail) {
     Instant now = clock.instant();
     String correlationId = MDC.get(CorrelationIdFilter.MDC_KEY);
+    String traceparent = traces.current();
     for (Ledger.AppliedEntry applied : trail) {
       Account account = applied.accountAfter();
       UUID eventId = UUID.randomUUID();
@@ -60,7 +68,8 @@ class AccountEntryEventWriter {
               properties.accountEntriesTopic(),
               account.id().toString(),
               json.writeValueAsString(event),
-              correlationId));
+              correlationId,
+              traceparent));
     }
   }
 }
