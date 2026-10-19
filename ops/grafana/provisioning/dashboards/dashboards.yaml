@@ -1,0 +1,11 @@
+# Loads every dashboard JSON in /var/lib/grafana/dashboards at startup.
+apiVersion: 1
+
+providers:
+  - name: daybook
+    folder: Daybook
+    type: file
+    # The files in git are the source of truth; edits made in the UI are not saved back.
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards

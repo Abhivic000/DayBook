@@ -1,0 +1,28 @@
+# Grafana Tempo in single-process mode: receives spans over OTLP and stores them on local disk.
+# Fine for a laptop; production would use object storage (S3, GCS) instead.
+stream_over_http_enabled: true
+
+server:
+  http_listen_port: 3200
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        http:
+          endpoint: 0.0.0.0:4318
+
+storage:
+  trace:
+    backend: local
+    # /tmp: writable by Tempo's non-root user without fixing volume permissions. Traces are
+    # throwaway in the local stack.
+    wal:
+      path: /tmp/tempo/wal
+    local:
+      path: /tmp/tempo/blocks
+
+compactor:
+  compaction:
+    # Keep traces for a day.
+    block_retention: 24h

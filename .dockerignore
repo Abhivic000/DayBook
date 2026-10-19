@@ -1,0 +1,15 @@
+# Keep the build context small and free of local state: only poms, sources and the Maven wrapper
+# are needed (see Dockerfile).
+.git
+.github
+.vscode
+.idea
+docs
+scripts
+ops
+**/target
+**/bin
+*.log
+.env
+.env.*
+CLAUDE.md

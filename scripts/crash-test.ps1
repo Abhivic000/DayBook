@@ -4,7 +4,7 @@
     API is killed are published after restart and applied by the consumer exactly once.
 
 .DESCRIPTION
-    Needs: Docker Compose stack running (docker compose up -d --wait) and both jars built
+    Needs: Postgres and Kafka running (docker compose up -d --wait postgres kafka) and both jars built
     (.\mvnw.cmd package -DskipTests, or verify). Starts its own API and consumer on separate ports.
 
     Phase 1  API runs with its outbox relay OFF: transfers commit, events wait in the outbox.

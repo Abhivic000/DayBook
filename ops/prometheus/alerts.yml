@@ -1,0 +1,104 @@
+# Alert rules (FR-11.6). Each alert names the failure it detects and what to look at first.
+# Firing alerts are visible in Prometheus (http://localhost:9090/alerts) and Grafana. Routing them
+# to people (Alertmanager: email, Slack, paging) is deliberately out of scope for a local stack.
+#
+# "for" = how long the condition must hold before firing, so a single blip does not page anyone.
+groups:
+  - name: daybook-money
+    rules:
+      # The central claim: money is never created or destroyed. Any CRITICAL violation is a bug.
+      - alert: ReconciliationCriticalViolation
+        expr: sum(daybook_reconciliation_violations{severity="CRITICAL"}) > 0
+        labels:
+          severity: critical
+        annotations:
+          summary: "Reconciliation found {{ $value }} critical violation(s)"
+          description: >-
+            The ledger broke an invariant (balance drift, unbalanced transaction, negative balance,
+            hold or projection mismatch). Do not repair data: read the run's violations with
+            GET /v1/admin/reconciliation/runs and find the cause.
+
+      - alert: ReconciliationWarning
+        expr: sum by (check) (daybook_reconciliation_violations{severity="WARNING"}) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Reconciliation check {{ $labels.check }} has warnings for 15 minutes"
+          description: >-
+            Not a money error, but something is stuck: PENDING transactions the PSP cannot
+            confirm, outbox lag, or a stale projection.
+
+      # A proof that stopped running proves nothing.
+      - alert: ReconciliationNotRunning
+        expr: time() - daybook_reconciliation_last_completed_seconds > 900
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No reconciliation run has completed in 15 minutes"
+          description: "Check the API logs for the reconciliation job (runs every 5 minutes)."
+
+  - name: daybook-events
+    rules:
+      # Rising age = the relay or Kafka is stuck while the API keeps serving (ADR 0014).
+      - alert: OutboxLagging
+        expr: daybook_outbox_oldest_unpublished_age_seconds > 60
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Oldest unpublished outbox event is {{ $value | humanizeDuration }} old"
+          description: "Is Kafka reachable from the API? Check outbox_events.last_error."
+
+      - alert: DeadLettersPresent
+        expr: daybook_dlq_depth > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $value }} message(s) in the dead-letter table"
+          description: >-
+            Statements are missing these events. Inspect them with GET /v1/admin/dlq on the
+            consumer (port 8082).
+
+      - alert: ConsumerLagging
+        expr: max(kafka_consumer_fetch_manager_records_lag_max{application="daybook-consumer"}) > 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Consumer is {{ $value }} records behind"
+          description: "Statements are stale. Is the consumer running and healthy?"
+
+  - name: daybook-service
+    rules:
+      - alert: PspCircuitOpen
+        expr: resilience4j_circuitbreaker_state{name="psp", state="open"} == 1
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PSP circuit breaker is open"
+          description: >-
+            Top-ups and withdrawals are being refused with 503 because the PSP is failing or
+            slow. Check the PSP; the breaker probes it again on its own.
+
+      - alert: HighServerErrorRate
+        expr: >-
+          sum by (application) (rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+            / sum by (application) (rate(http_server_requests_seconds_count[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.application }}: {{ $value | humanizePercentage }} of requests fail with 5xx"
+          description: "Check the logs for errors; a 503 burst usually means the PSP breaker is open."
+
+      - alert: AppDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.job }} is not reachable by Prometheus"
+          description: "The process is down or its /actuator/prometheus endpoint fails."
