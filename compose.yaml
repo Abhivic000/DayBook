@@ -180,5 +180,17 @@ services:
       - prometheus
       - tempo
 
+  # --- Tools (not started by "up"; run on demand) ---------------------------------------------
+
+  # Load and chaos traffic: docker compose --profile tools run --rm k6 run /scripts/load-test.js
+  k6:
+    image: grafana/k6:2.3.0
+    profiles: [tools]
+    volumes:
+      - ./load:/scripts
+    environment:
+      BASE_URL: http://api:8080
+      ADMIN_KEY: ${DAYBOOK_ADMIN_KEY:-dev-admin-key}
+
 volumes:
   postgres-data:

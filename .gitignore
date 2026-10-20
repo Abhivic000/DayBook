@@ -22,6 +22,10 @@ bin/
 .env.*
 !.env.example
 
+# k6 run output (the README records the measured numbers)
+load/results/*
+!load/results/.gitkeep
+
 # Logs and OS noise
 *.log
 .DS_Store
