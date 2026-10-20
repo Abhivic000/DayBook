@@ -7,6 +7,11 @@ spring:
     url: ${DAYBOOK_DB_URL}
     username: ${DAYBOOK_DB_USER}
     password: ${DAYBOOK_DB_PASSWORD}
+    hikari:
+      # Connections held open to PostgreSQL. Measured (README, "Where it saturates"): 20 was no
+      # faster than 10 — under hot-account load the extra connections only queue on the same row
+      # lock. Every API instance × this value must stay below Postgres's max_connections (100).
+      maximum-pool-size: ${DAYBOOK_DB_POOL_SIZE:10}
   flyway:
     # Schema is owned by versioned migrations in db/migration — never auto-generated.
     locations: classpath:db/migration

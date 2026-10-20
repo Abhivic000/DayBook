@@ -97,6 +97,7 @@ services:
       # Password migration V6 gives the consumer's database role (ADR 0013).
       DAYBOOK_CONSUMER_DB_PASSWORD: ${DAYBOOK_CONSUMER_DB_PASSWORD:-daybook_consumer}
       DAYBOOK_PSP_BASEURL: http://psp-sim:8090
+      DAYBOOK_DB_POOL_SIZE: ${DAYBOOK_DB_POOL_SIZE:-10}
       # The API docs are part of the product surface of this demo stack.
       SPRINGDOC_API_DOCS_ENABLED: "true"
       SPRINGDOC_SWAGGER_UI_ENABLED: "true"

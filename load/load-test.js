@@ -32,7 +32,7 @@ const arrival = (rate, fn) => ({
   timeUnit: '1s',
   duration: DURATION,
   preAllocatedVUs: Math.max(20, rate),
-  maxVUs: rate * 5,
+  maxVUs: Math.max(20, rate) * 5,
   exec: fn,
 });
 

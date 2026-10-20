@@ -135,12 +135,21 @@ one account, so they queue on its row lock.
 
 14,402 transfers settled; the sum of all balances afterwards was unchanged to the paisa.
 
-**Where it saturates.** Offered 300 + 100 (hot) transfers/s + 100 reads/s, the system completed
-about **270 transfers/s** (344 requests/s) with 0 errors and money still conserved, but requests
-queued: p50 5.5 s. Metrics showed why — all **10** database connections busy with up to 190
-requests waiting for one, while the API used at most 16 % CPU. The limit is the default
-connection-pool size, not the locking design: reads (which take no locks) slowed down exactly as
-much as hot-account transfers.
+**Where it saturates.** Offered 500 requests/s for a minute — 300 random transfers + 100 transfers
+on the one hot account + 100 reads per second — after a 30 s warm-up:
+
+| Run | Transfers settled | p50 latency | Errors | Money conserved |
+|---|---|---|---|---|
+| Pool of 10 database connections (default) | ~236/s | 7.0 s | 0 | yes |
+| Pool of 20 | ~214/s | 7.8 s | 0 | yes |
+| Pool of 20, the hot-account traffic moved to random accounts | **~392/s** | **21 ms** | 0 | yes |
+
+The limit is the **hot account**, not the hardware: the API used at most 36 % CPU. Transfers on
+one account must take its row lock one at a time — that is what keeps its balance correct — and
+each transfer waiting for the lock holds a database connection while it waits. At 100/s on one
+account, those waiters fill the connection pool (all busy, ~180 requests waiting for a connection)
+and everything else, even reads, queues behind them. A bigger pool does not help, it only lets
+more transfers wait on the same lock. Spread across accounts, the same load is served in 21 ms.
 
 ## Observability
 
